@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package greeting;
+
+import "proto/subdir/greeting_type.proto";
+
+message Greeting {
+  greeting_type.GreetingType greeting_type = 1;
+  string content = 2;
+  bool exclaim = 3;
+}

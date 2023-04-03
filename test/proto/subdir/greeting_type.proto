@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package greeting_type;
+
+enum GreetingType {
+  UNKNOWN_GREETING_TYPE = 0;
+  HELLO_GREETING_TYPE = 1;
+  AYYY_HOWS_IT_GOIN_GREETING_TYPE = 2;
+}

@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package types;
+
+message AllSimpleTypes {
+  // Comment for double
+  double double = 1;
+  float float = 2;
+  int64 int64 = 3;
+  // Comment for uint64 field
+  // with multiple lines
+  uint64 uint64 = 4;
+  int32 int32 = 5;
+  fixed64 fixed64 = 6;
+  fixed32 fixed32 = 7;
+  bool bool = 8;
+  string string = 9;
+
+  // TODO: Support groups?
+  // group group = 10;
+
+  SomeMessage some_message = 11;
+  bytes bytes = 12;
+  uint32 uint32 = 13;
+  SomeEnumValue some_enum_value = 14;
+  sfixed32 sfixed32 = 15;
+  sfixed64 sfixed64 = 16;
+  sint32 sint32 = 17;
+  sint64 sint64 = 18;
+
+  repeated int32 nonpacked_int32 = 19 [packed = false];
+  repeated int32 packed_int32 = 20;
+
+  map<string, bytes> map_with_bytes = 21;
+  map<string, int64> map_with_int64 = 2100;
+
+  repeated SomeEnumValue repeated_some_enum_value = 22;
+
+  reserved 23;
+
+  repeated SomeMessage repeated_some_message_field = 24;
+
+  oneof badabing_badaboom {
+    string badabing = 25;
+    string badaboom = 26;
+  }
+
+  oneof foo {
+    string bar = 27;
+    string baz = 28;
+  }
+
+  optional SomeMessage optional_some_message = 29;
+  SomeMessage nonoptional_some_message = 30;
+  optional int32 optional_int32 = 31;
+  int32 nonoptional_int32 = 32;
+
+  map<string, SomeMessage> map_with_msg_type = 33;
+
+  int32 int32_with_default_one = 34;
+
+  message SomeMessage {
+    string some_field = 1;
+    SomeMessageChild child = 2;
+
+    message SomeMessageChild {}
+  }
+
+  // A swag comment for SomeEnumValue
+  enum SomeEnumValue {
+    UNKNOWN_ENUM_VALUE = 0;
+    // A neat comment for first enum value.
+    FIRST_ENUM_VALUE = 1;
+    SECOND_ENUM_VALUE = 2;
+  }
+}

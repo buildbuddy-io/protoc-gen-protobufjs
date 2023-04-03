@@ -1,0 +1,4 @@
+# C++14 is needed by rules_proto
+build --cxxopt=-std=c++14
+build --host_cxxopt=-std=c++14
+

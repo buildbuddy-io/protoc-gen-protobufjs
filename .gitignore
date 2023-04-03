@@ -1,0 +1,14 @@
+# Binaries
+/protoc-gen-protobufjs
+/protoc
+
+# Test build outputs
+/test/node_modules
+/test/proto/**/*.ts
+/test/proto/google
+/test/**/*.js
+/test/gen
+/test/out
+
+# Bazel convenience symlinks
+/bazel-*

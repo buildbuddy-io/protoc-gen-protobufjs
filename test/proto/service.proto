@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package myservice;
+
+message GetThingRequest {
+  string id = 1;
+}
+
+message GetThingResponse {
+  string thing = 1;
+}
+
+// A service that lets you do stuff with things.
+service Things {
+  // Gets a thing by ID.
+  rpc GetThing(GetThingRequest) returns (GetThingResponse);
+
+  rpc GetOtherThing(GetThingRequest) returns (GetThingResponse);
+}

@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package multifile.a;
+
+message A {
+  string a = 1;
+}

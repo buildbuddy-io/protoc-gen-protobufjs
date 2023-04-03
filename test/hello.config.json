@@ -1,0 +1,23 @@
+{
+  "library": {
+    "importPath": "./tspb"
+  },
+  "service": {
+    "preamble": [
+      "import { UnaryTransport } from './transport';",
+      "import { CancelablePromise } from '../util/async';"
+    ],
+    "transport": {
+      "unary": {
+        "type": "UnaryTransport",
+        "returnType": "CancelablePromise"
+      }
+    }
+  },
+  "resolutions": {
+    "google/protobuf/timestamp.proto": {
+      "package": "google.protobuf.timestamp",
+      "symbols": "Timestamp"
+    }
+  }
+}

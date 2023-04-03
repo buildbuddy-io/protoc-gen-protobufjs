@@ -1,0 +1,19 @@
+{
+  "name": "out",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "cd ../ && ./test/run.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^18.15.11",
+    "long": "^5.2.1",
+    "protobufjs": "^7.2.3",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
+  }
+}

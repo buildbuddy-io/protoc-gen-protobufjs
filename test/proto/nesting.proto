@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package nested.pkg.name;
+
+message TopLevelMessage {
+  message NestedMessageL1 {
+    enum NestedEnumL2 { UNKNOWN_NESTED_ENUM_L2 = 0; }
+
+    message NestedMessageL2 {}
+  }
+}
+
+enum TopLevelEnum { UNKNOWN_TOP_LEVEL_ENUM = 0; }
