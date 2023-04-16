@@ -2,6 +2,9 @@
 /protoc-gen-protobufjs
 /protoc
 
+# Release archive
+/*.tar.gz
+
 # Test build outputs
 /test/node_modules
 /test/proto/**/*.ts
