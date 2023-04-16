@@ -12,4 +12,6 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           tag=$(git tag)
           tar czf "protoc-gen-protobufjs-${tag}.tar.gz" LICENSE WORKSPACE BUILD go.mod go.sum *.bzl *.go
+          GH_TOKEN=${{ github.token }} gh release create "$tag" --draft --title="$tag"
           GH_TOKEN=${{ github.token }} gh release upload "$tag" "protoc-gen-protobufjs-${tag}.tar.gz" --clobber
+          GH_TOKEN=${{ github.token }} gh release edit "$tag" --draft=false --latest
