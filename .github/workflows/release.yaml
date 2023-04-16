@@ -12,7 +12,7 @@ jobs:
       - name: Upload release assets
         run: |
           cd "$GITHUB_WORKSPACE"
-          tag=$(git tag)
+          tag=$(git tag --points-at HEAD)
           tar czf "protoc-gen-protobufjs-${tag}.tar.gz" LICENSE WORKSPACE BUILD go.mod go.sum *.bzl *.go
           GH_TOKEN=${{ github.token }} gh release create "$tag" --draft --title="$tag"
           GH_TOKEN=${{ github.token }} gh release upload "$tag" "protoc-gen-protobufjs-${tag}.tar.gz" --clobber
