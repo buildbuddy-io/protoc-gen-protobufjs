@@ -12,11 +12,10 @@ large, evolving projects with many protos. The generated code uses
   https://github.com/buildbuddy-io/buildbuddy brings the code generation
   time from ~19s to ~1.8s.
 
-- Supports incremental compilation, which can speed up build systems that
-  use content-based caching, like [Bazel](https://bazel.build). By
-  default, `protobufjs-cli` bundles all transitive dependencies into the
-  output `.js` file, which causes an explosion of unnecessary dependency
-  edges in the build graph[^1].
+- Supports generating code for only a single `.proto` file and not its
+  imported files[^1]. This makes it a good fit for build systems like
+  [Bazel](https://bazel.build) which are optimized for many small build
+  steps rather than a few big build steps.
 
 - Imports are declared explicitly, rather than referencing global "roots".
   This makes it easier to navigate the generated code.
@@ -24,12 +23,15 @@ large, evolving projects with many protos. The generated code uses
 - Generated code preserves comments from the original proto source.
 
 [^1]:
-    `protobufjs-cli` does have a `--sparse` option, but this only
-    excludes _indirect_ imports from the output JS. For example, let's say
-    we have `a.proto` that imports `b.proto`, and `b.proto` imports
-    `c.proto`. Then `pbjs --sparse a.proto` generates code for both A and
-    B in the output. With `protoc-gen-protobufjs`, the generated code only
-    contains A, and instead generates an _import_ for B.
+    By default, `protobufjs-cli` bundles all transitive dependencies
+    into the output `.js` file, which causes an explosion of unnecessary
+    dependency edges in the build graph. `protobufjs-cli` does have a
+    `--sparse` option, but this only excludes _indirect_ imports from the
+    output JS. For example, let's say we have `a.proto` that imports
+    `b.proto`, and `b.proto` imports `c.proto`. Then
+    `pbjs --sparse a.proto` generates code for both A and B in the output.
+    With `protoc-gen-protobufjs`, the generated code only contains A, and
+    instead generates an _import_ for B.
 
 ## protobufjs-cli compatibility
 
