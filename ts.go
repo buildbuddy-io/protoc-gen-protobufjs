@@ -13,51 +13,13 @@ var (
 	methodDefinition = regexp.MustCompile(`^((static|get|set) )?[a-zA-Z0-9_]+\(.*\)(: .*?)? \{$`)
 )
 
-type tsImport struct {
-	pkg, defaultImport string
-	symbols            map[string]string
-}
-
-func (t *tsImport) String() string {
-	out := "import"
-	from := false
-	if t.defaultImport != "" {
-		from = true
-		out += " "
-		out += t.defaultImport
-		if len(t.symbols) > 0 {
-			out += ","
-		}
-	}
-	if len(t.symbols) > 0 {
-		from = true
-		out += " {"
-		sortedSymbols := make([]string, 0, len(t.symbols))
-		for s := range t.symbols {
-			sortedSymbols = append(sortedSymbols, s)
-		}
-		sort.StringSlice(sortedSymbols).Sort()
-		for i, s := range sortedSymbols {
-			out += " "
-			out += s
-			if alias := t.symbols[s]; s != alias {
-				out += " as "
-				out += alias
-			}
-			if i < len(t.symbols)-1 {
-				out += ","
-			}
-		}
-		out += " }"
-	}
-	if from {
-		out += " from"
-	}
-	out += ` "` + t.pkg + *importModuleSpecifierEnding + `";`
-	return out
-}
-
-// TS represents TypeScript source code.
+// TS represents generated TypeScript source code.
+//
+// It automatically keeps track of indentation, in order to ease the burden of
+// refactoring the codegen. However, it does not implement a full TypeScript
+// AST. Instead, it relies on simple heuristics to determine when to indent. For
+// example, a line that ends with "{" is treated as a block start, and the
+// indentation level is increased.
 type TS struct {
 	JS bool
 
@@ -245,4 +207,48 @@ func (g *TS) String() string {
 
 func isMethodOrConstructorDefinitionStart(line string) bool {
 	return methodDefinition.MatchString(line)
+}
+
+type tsImport struct {
+	pkg, defaultImport string
+	symbols            map[string]string
+}
+
+func (t *tsImport) String() string {
+	out := "import"
+	from := false
+	if t.defaultImport != "" {
+		from = true
+		out += " "
+		out += t.defaultImport
+		if len(t.symbols) > 0 {
+			out += ","
+		}
+	}
+	if len(t.symbols) > 0 {
+		from = true
+		out += " {"
+		sortedSymbols := make([]string, 0, len(t.symbols))
+		for s := range t.symbols {
+			sortedSymbols = append(sortedSymbols, s)
+		}
+		sort.StringSlice(sortedSymbols).Sort()
+		for i, s := range sortedSymbols {
+			out += " "
+			out += s
+			if alias := t.symbols[s]; s != alias {
+				out += " as "
+				out += alias
+			}
+			if i < len(t.symbols)-1 {
+				out += ","
+			}
+		}
+		out += " }"
+	}
+	if from {
+		out += " from"
+	}
+	out += ` "` + t.pkg + *importModuleSpecifierEnding + `";`
+	return out
 }

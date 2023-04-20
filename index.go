@@ -16,6 +16,8 @@ type Index struct {
 	FilesByType map[string]*descriptorpb.FileDescriptorProto
 }
 
+// BuildIndex traverses the incoming CodeGeneratorRequest and builds up a few
+// maps that make it fast and easy to look up various protos by name.
 func BuildIndex(req *pluginpb.CodeGeneratorRequest) *Index {
 	idx := &Index{
 		Files:        map[string]*descriptorpb.FileDescriptorProto{},

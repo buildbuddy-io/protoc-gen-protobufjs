@@ -7,10 +7,13 @@ gazelle(name = "gazelle")
 go_library(
     name = "protoc-gen-protobufjs_lib",
     srcs = [
+        "codegen.go",
         "flags.go",
         "index.go",
+        "logging.go",
         "main.go",
         "ts.go",
+        "util.go",
     ],
     importpath = "github.com/buildbuddy-io/protoc-gen-protobufjs",
     visibility = ["//visibility:private"],
