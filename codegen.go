@@ -543,23 +543,23 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		//
 		d.Lf("static fromObject(object: Record<string, any>): %s;", messageType.GetName())
 		j.L("static fromObject(object) {")
-		j.Lf("if (object instanceof $root.%s.%s) {", curNS, messageType.GetName())
+		j.Lf("if (object instanceof $root.%s.%s) {", ns, messageType.GetName())
 		j.L("return object;")
 		j.L("}")
-		j.Lf("const message = new $root.%s.%s();", curNS, messageType.GetName())
+		j.Lf("const message = new $root.%s.%s();", ns, messageType.GetName())
 		for _, f := range messageType.GetField() {
 			// Map fields
 			if c.isMapField(f) {
 				j.Lf("if (object.%s) {", f.GetJsonName())
 				j.Lf(`if (typeof object.%s !== "object") {`, f.GetJsonName())
-				j.Lf(`throw new TypeError(".%s.%s.%s: object expected, but got " + (typeof object.%s));`, curNS, messageType.GetName(), f.GetJsonName(), f.GetJsonName())
+				j.Lf(`throw new TypeError(".%s.%s.%s: object expected, but got " + (typeof object.%s));`, ns, messageType.GetName(), f.GetJsonName(), f.GetJsonName())
 				j.L("}")
 				j.Lf("for (let keys = Object.keys(object.%s), i = 0; i < keys.length; ++i) {", f.GetJsonName())
 				src := fmt.Sprintf("object.%s[keys[i]]", f.GetJsonName())
 				dest := fmt.Sprintf("message.%s[keys[i]]", f.GetJsonName())
 				mapEntryType := c.Index.MessageTypes[f.GetTypeName()]
 				vf := mapEntryType.GetField()[1]
-				c.generateFromObjectConversionStatements(dest, src, vf, messageType, curNS)
+				c.generateFromObjectConversionStatements(dest, src, vf, messageType, ns)
 				j.Lf("}")
 				j.L("}")
 				continue
@@ -568,13 +568,13 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 			if f.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
 				j.Lf("if (object.%s) {", f.GetJsonName())
 				j.Lf("if (!Array.isArray(object.%s)) {", f.GetJsonName())
-				j.Lf(`throw new TypeError(".%s.%s.%s: array type expected, but got " + (typeof object.%s))`, curNS, messageType.GetName(), f.GetJsonName(), f.GetJsonName())
+				j.Lf(`throw new TypeError(".%s.%s.%s: array type expected, but got " + (typeof object.%s))`, ns, messageType.GetName(), f.GetJsonName(), f.GetJsonName())
 				j.Lf("}")
 				j.Lf("message.%s = new Array(object.%s.length);", f.GetJsonName(), f.GetJsonName())
 				j.Lf("for (let i = 0; i < object.%s.length; ++i) {", f.GetJsonName())
 				src := fmt.Sprintf("object.%s[i]", f.GetJsonName())
 				dest := fmt.Sprintf("message.%s[i]", f.GetJsonName())
-				c.generateFromObjectConversionStatements(dest, src, f, messageType, curNS)
+				c.generateFromObjectConversionStatements(dest, src, f, messageType, ns)
 				j.Lf("}")
 				j.Lf("}")
 				continue
@@ -584,7 +584,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 			j.Lf("if (object.%s != null) {", f.GetJsonName())
 			src := fmt.Sprintf("object.%s", f.GetJsonName())
 			dest := fmt.Sprintf("message.%s", f.GetJsonName())
-			c.generateFromObjectConversionStatements(dest, src, f, messageType, curNS)
+			c.generateFromObjectConversionStatements(dest, src, f, messageType, ns)
 			j.Lf("}")
 		}
 		j.L("return message;")
@@ -710,7 +710,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		nestedMessageTypes := excludeMapEntries(messageType.GetNestedType())
 		if len(nestedMessageTypes) > 0 || len(messageType.GetEnumType()) > 0 {
 			d.Lf("export namespace %s {", messageType.GetName())
-			c.generate(file, messagePath, messageType.GetName(), nestedMessageTypes, messageType.GetEnumType(), nil /*=services*/)
+			c.generate(file, messagePath, ns+"."+messageType.GetName(), nestedMessageTypes, messageType.GetEnumType(), nil /*=services*/)
 			d.L("}")
 		}
 
@@ -976,7 +976,7 @@ func (c *Codegen) defaultValueExpression(f *descriptorpb.FieldDescriptorProto) s
 	}
 }
 
-func (c *Codegen) generateFromObjectConversionStatements(dest, src string, f *descriptorpb.FieldDescriptorProto, messageType *descriptorpb.DescriptorProto, curNS string) {
+func (c *Codegen) generateFromObjectConversionStatements(dest, src string, f *descriptorpb.FieldDescriptorProto, messageType *descriptorpb.DescriptorProto, ns string) {
 	j := c.j
 	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_ENUM {
 		j.Lf("switch (%s) {", src)
@@ -1008,7 +1008,7 @@ func (c *Codegen) generateFromObjectConversionStatements(dest, src string, f *de
 	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
 		j.Lf(`if (typeof %s !== "object") {`, src)
 		// TODO: include full field path in error here
-		j.Lf(`throw new TypeError(".%s.%s.%s: object expected, but got " + (typeof %s));`, curNS, messageType.GetName(), f.GetJsonName(), src)
+		j.Lf(`throw new TypeError(".%s.%s.%s: object expected, but got " + (typeof %s));`, ns, messageType.GetName(), f.GetJsonName(), src)
 		j.Lf("}")
 		j.Lf("%s = %s.fromObject(%s);", dest, c.resolveTypeName(f.GetTypeName(), "$root."), src)
 		return
