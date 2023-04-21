@@ -1,6 +1,7 @@
 # protoc-gen-protobufjs
 
-A `protoc` plugin to generate TypeScript code from `.proto` files.
+A `protoc` plugin to generate JavaScript code from `.proto` files along
+with TypeScript declarations.
 
 It is intended as a faster replacement for `protobufjs-cli`, ideal for
 large, evolving projects with many protos. The generated code uses
