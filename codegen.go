@@ -539,8 +539,61 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		j.L("}") // decode()
 
 		//
+		// fromObject method
+		//
+		d.Lf("static fromObject(object: Record<string, any>): %s;", messageType.GetName())
+		j.L("static fromObject(object) {")
+		j.Lf("if (object instanceof $root.%s.%s) {", curNS, messageType.GetName())
+		j.L("return object;")
+		j.L("}")
+		j.Lf("const message = new $root.%s.%s();", curNS, messageType.GetName())
+		for _, f := range messageType.GetField() {
+			// Map fields
+			if c.isMapField(f) {
+				j.Lf("if (object.%s) {", f.GetJsonName())
+				j.Lf(`if (typeof object.%s !== "object") {`, f.GetJsonName())
+				j.Lf(`throw new TypeError(".%s.%s.%s: object expected, but got " + (typeof object.%s));`, curNS, messageType.GetName(), f.GetJsonName(), f.GetJsonName())
+				j.L("}")
+				j.Lf("for (let keys = Object.keys(object.%s), i = 0; i < keys.length; ++i) {", f.GetJsonName())
+				src := fmt.Sprintf("object.%s[keys[i]]", f.GetJsonName())
+				dest := fmt.Sprintf("message.%s[keys[i]]", f.GetJsonName())
+				mapEntryType := c.Index.MessageTypes[f.GetTypeName()]
+				vf := mapEntryType.GetField()[1]
+				c.generateFromObjectConversionStatements(dest, src, vf, messageType, curNS)
+				j.Lf("}")
+				j.L("}")
+				continue
+			}
+			// Repeated fields
+			if f.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+				j.Lf("if (object.%s) {", f.GetJsonName())
+				j.Lf("if (!Array.isArray(object.%s)) {", f.GetJsonName())
+				j.Lf(`throw new TypeError(".%s.%s.%s: array type expected, but got " + (typeof object.%s))`, curNS, messageType.GetName(), f.GetJsonName(), f.GetJsonName())
+				j.Lf("}")
+				j.Lf("message.%s = new Array(object.%s.length);", f.GetJsonName(), f.GetJsonName())
+				j.Lf("for (let i = 0; i < object.%s.length; ++i) {", f.GetJsonName())
+				src := fmt.Sprintf("object.%s[i]", f.GetJsonName())
+				dest := fmt.Sprintf("message.%s[i]", f.GetJsonName())
+				c.generateFromObjectConversionStatements(dest, src, f, messageType, curNS)
+				j.Lf("}")
+				j.Lf("}")
+				continue
+			}
+
+			// Non-repeated fields
+			j.Lf("if (object.%s != null) {", f.GetJsonName())
+			src := fmt.Sprintf("object.%s", f.GetJsonName())
+			dest := fmt.Sprintf("message.%s", f.GetJsonName())
+			c.generateFromObjectConversionStatements(dest, src, f, messageType, curNS)
+			j.Lf("}")
+		}
+		j.L("return message;")
+		j.L("}")
+
+		//
 		// toObject method
 		//
+
 		d.Lf("static toObject(message: %s, options: $protobuf.IConversionOptions): Record<string, any>;", messageType.GetName())
 		j.L("static toObject(message, options = {}) {")
 		j.L("const object = {};")
@@ -602,7 +655,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 				j.Lf("if (message.%s && (keys = Object.keys(message.%s)).length) {", f.GetJsonName(), f.GetJsonName())
 				j.Lf("object.%s = {};", f.GetJsonName())
 				j.L("for (let i = 0; i < keys.length; ++i) {")
-				j.Lf("object.%s[keys[i]] = %s;", f.GetJsonName(), c.objectConversionExpression(vf, "message."+f.GetJsonName()+"[keys[i]]"))
+				j.Lf("object.%s[keys[i]] = %s;", f.GetJsonName(), c.toObjectConversionExpression(vf, "message."+f.GetJsonName()+"[keys[i]]"))
 				j.L("}")
 				j.L("}")
 				continue
@@ -611,13 +664,13 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 				j.Lf(`if (message.%s && message.%s.length) {`, f.GetJsonName(), f.GetJsonName())
 				j.Lf("object.%s = new Array(message.%s.length);", f.GetJsonName(), f.GetJsonName())
 				j.Lf("for (let i = 0; i < message.%s.length; ++i) {", f.GetJsonName())
-				j.Lf("object.%s[i] = %s;", f.GetJsonName(), c.objectConversionExpression(f, "message.%s[i]", f.GetJsonName()))
+				j.Lf("object.%s[i] = %s;", f.GetJsonName(), c.toObjectConversionExpression(f, "message.%s[i]", f.GetJsonName()))
 				j.Lf("}")
 				j.Lf("}")
 				continue
 			}
 			j.Lf(`if (message.%s != null && message.hasOwnProperty("%s")) {`, f.GetJsonName(), f.GetJsonName())
-			j.Lf("object.%s = %s;", f.GetJsonName(), c.objectConversionExpression(f, "message.%s", f.GetJsonName()))
+			j.Lf("object.%s = %s;", f.GetJsonName(), c.toObjectConversionExpression(f, "message.%s", f.GetJsonName()))
 			if f.OneofIndex != nil && !f.GetProto3Optional() {
 				j.L("if (options.oneofs) {")
 				j.Lf(`object.%s = "%s";`, oneofFieldName(parentOneof(messageType, f)), f.GetJsonName())
@@ -923,7 +976,92 @@ func (c *Codegen) defaultValueExpression(f *descriptorpb.FieldDescriptorProto) s
 	}
 }
 
-func (c *Codegen) objectConversionExpression(f *descriptorpb.FieldDescriptorProto, expr string, args ...any) string {
+func (c *Codegen) generateFromObjectConversionStatements(dest, src string, f *descriptorpb.FieldDescriptorProto, messageType *descriptorpb.DescriptorProto, curNS string) {
+	j := c.j
+	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_ENUM {
+		j.Lf("switch (%s) {", src)
+		et := c.Index.EnumTypes[f.GetTypeName()]
+		for _, v := range et.GetValue() {
+			j.Lf(`case "%s":`, v.GetName())
+			j.Lf("case %d: {", v.GetNumber())
+			j.Lf("%s = %d;", dest, v.GetNumber())
+			j.Lf("break;")
+			j.Lf("}")
+		}
+
+		j.Lf("default: {")
+		j.Lf(`if (typeof %s == "number") {`, src)
+		j.Lf("%s = %s;", dest, src)
+		j.Lf("break;")
+		j.Lf("}")
+		// Fallback to default value (0) for repeated fields
+		// to avoid leaving holes
+		if f.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+			j.Lf("%s = 0;", dest)
+		}
+		j.Lf("break;")
+		j.Lf("}") // end case default
+
+		j.Lf("}") // end switch
+		return
+	}
+	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
+		j.Lf(`if (typeof %s !== "object") {`, src)
+		// TODO: include full field path in error here
+		j.Lf(`throw new TypeError(".%s.%s.%s: object expected, but got " + (typeof %s));`, curNS, messageType.GetName(), f.GetJsonName(), src)
+		j.Lf("}")
+		j.Lf("%s = %s.fromObject(%s);", dest, c.resolveTypeName(f.GetTypeName(), "$root."), src)
+		return
+	}
+	if isFloatingPoint(f.GetType()) {
+		j.Lf("%s = Number(%s);", dest, src)
+		return
+	}
+	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_UINT32 ||
+		f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_FIXED32 {
+		j.Lf("%s = %s >>> 0;", dest, src)
+		return
+	}
+	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_INT32 ||
+		f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_SINT32 ||
+		f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_SFIXED32 {
+		j.Lf("%s = %s | 0;", dest, src)
+		return
+	}
+	if isLong(f.GetType()) {
+		j.Lf("if ($util.Long) {")
+		j.Lf("(%s = $util.Long.fromValue(%s)).unsigned = %t;", dest, src, isUint(f.GetType()))
+		j.Lf(`} else if (typeof %s === "string") {`, src)
+		j.Lf(`%s = parseInt(%s, 10);`, dest, src)
+		j.Lf(`} else if (typeof %s === "number") {`, src)
+		j.Lf(`%s = %s;`, dest, src)
+		j.Lf(`} else if (typeof %s === "object") {`, src)
+		toNumberArg := ""
+		if isUint(f.GetType()) {
+			toNumberArg = "true"
+		}
+		j.Lf(`%s = new $util.LongBits(%s.low >>> 0, %s.high >>> 0).toNumber(%s);`, dest, src, src, toNumberArg)
+		j.Lf("}")
+		return
+	}
+	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_BYTES {
+		j.Lf(`if (typeof %s === "string") {`, src)
+		j.Lf(`$util.base64.decode(%s, %s = $util.newBuffer($util.base64.length(%s)), 0);`, src, dest, src)
+		j.Lf("} else if (%s.length >= 0) {", src)
+		j.Lf("%s = %s;", dest, src)
+		j.Lf("}")
+		return
+	}
+	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_STRING {
+		j.Lf("%s = String(%s);", dest, src)
+		return
+	}
+	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_BOOL {
+		j.Lf("%s = Boolean(%s);", dest, src)
+	}
+}
+
+func (c *Codegen) toObjectConversionExpression(f *descriptorpb.FieldDescriptorProto, expr string, args ...any) string {
 	expr = fmt.Sprintf(expr, args...)
 	if isLong(f.GetType()) {
 		toNumberArg := ""
