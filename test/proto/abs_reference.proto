@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package abs_reference;
+
+message Scope1 {
+  message Scope2 {
+    message A {}
+
+    message Scope1 {
+      Scope2.A field_a = 1;
+      .abs_reference.Scope2.B field_b_should_be_message = 2;
+      abs_reference.Scope2.B field_b_should_be_enum = 3;
+      .abs_reference.Scope1.Scope2 field_c = 4;
+    }
+
+    // Attempt to confuse the field references above by defining a message that
+    // clashes with the root package name.
+    message abs_reference {
+      // Attempt to further cause confusion by having this message define
+      // submessages with conflicting field types.
+      message Scope2 {
+        enum B { UNKNOWN_SCOPE2_ENUM_A = 0; }
+      }
+    }
+  }
+}
+
+message Scope2 {
+  message B {}
+}

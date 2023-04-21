@@ -49,6 +49,7 @@ _pbjs proto/trivial.proto &
 _pbjs proto/types.proto &
 _pbjs proto/nesting.proto &
 _pbjs proto/service.proto &
+_pbjs proto/abs_reference.proto &
 OUT=proto/multifile/multifile.proto _pbjs proto/multi/*.proto &
 wait
 
@@ -65,6 +66,7 @@ _protoc ./proto/trivial.proto
 _protoc ./proto/types.proto
 _protoc ./proto/service.proto
 _protoc ./proto/nesting.proto
+_protoc ./proto/abs_reference.proto
 _protoc ./proto/multifile/a.proto ./proto/multifile/b.proto --protobufjs_opt=-out=proto/multifile/multifile.ts
 
 echo "Compiling encode.ts"
