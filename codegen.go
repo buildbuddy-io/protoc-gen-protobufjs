@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,23 +12,14 @@ import (
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
-const (
-	fileDescriptorMessageTypeTagNumber int32 = 4
-	fileDescriptorEnumTypeTagNumber    int32 = 5
-	fileDescriptorServiceTagNumber     int32 = 6
-	descriptorFieldTagNumber           int32 = 2
-	descriptorNestedTypeTagNumber      int32 = 3
-	descriptorEnumTypeTagNumber        int32 = 4
-	enumDescriptorValueTagNumber       int32 = 2
-	serviceMethodTagNumber             int32 = 2
+var (
+	importPathFlag              = StringSlice("import_path", []string{}, "A mapping of proto imports to TS imports, as `PROTO_PATH=TS_PATH` pairs (this flag can be specified more than once). If the proto does not end with '.proto' then these act as directory prefixes.")
+	strictImportsFlag           = flag.Bool("strict_imports", false, "If set, all directly imported protos must have an -import_path specified. This prevents the plugin from \"guessing\" import paths based on the proto path. This is also useful when integrating with build systems where all direct dependencies must be explicitly specified.")
+	importModuleSpecifierEnding = flag.String("import_module_specifier_ending", "", "Suffix to apply to generated import module specifiers. May need to be set to \".js\" in rare cases.")
 
-	varintWireType int32 = 0
-	i64WireType    int32 = 1
-	lenWireType    int32 = 2
-	i32WireType    int32 = 5
-	// note: group wire types are unsupported
+	outFlag = flag.String("out", "", "Output file `path`. If this is set and multiple protos are provided as input, the generated code for all protos will be written to this file. Any '.ts' or '.js' extension will be ignored.")
 
-	wireTypeMask = 7
+	importPaths = map[string]string{}
 )
 
 func generateCode(req *pluginpb.CodeGeneratorRequest) (*pluginpb.CodeGeneratorResponse, error) {
@@ -97,8 +89,7 @@ func generateCode(req *pluginpb.CodeGeneratorRequest) (*pluginpb.CodeGeneratorRe
 
 // Namespace represents a namespace tree to be generated.
 type Namespace struct {
-	Name string
-	// FileSymbols []*SymbolSet
+	Name     string
 	Files    []*descriptorpb.FileDescriptorProto
 	Children map[string]*Namespace
 }
@@ -433,7 +424,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 			// Non-repeated fields
 			j.Lf(`if (message.%s != null && Object.hasOwnProperty.call(message, "%s")) {`, f.GetJsonName(), f.GetJsonName())
 			if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
-				// TODO: handle groups (see genTypePartial in protobufjs encoder.js)
+				// TODO: handle groups
 				classReference := c.resolveTypeName(f.GetTypeName(), "$root.")
 				j.Lf("%s.encode(message.%s, writer.uint32(%d).fork()).ldelim();", classReference, f.GetJsonName(), f.GetNumber()<<3|lenWireType)
 			} else {
@@ -575,9 +566,9 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 			if f.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED || c.isMapField(f) || f.GetProto3Optional() || f.OneofIndex != nil {
 				continue
 			}
-			if c.isLong(f.GetType()) {
+			if isLong(f.GetType()) {
 				j.L("if ($util.Long) {")
-				j.Lf("let long = new $util.Long(0, 0, %t)", c.isUnsigned(f.GetType()))
+				j.Lf("let long = new $util.Long(0, 0, %t)", isUint(f.GetType()))
 				j.Lf(`object.%s = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;`, f.GetJsonName())
 				j.L("} else {")
 				j.Lf(`object.%s = options.longs === String ? "0" : 0;`, f.GetJsonName())
@@ -706,7 +697,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 			d.BlockComment(c.Comments[file.GetName()][fmt.Sprint(methodPath)])
 			d.Lf(
 				`%s: { readonly name: "%s" } & ((request: %s) => Promise<%s>);`,
-				methodName(method), method.GetName(), interfaceTypeName(c.resolveTypeName(method.GetInputType(), "")), c.resolveTypeName(method.GetOutputType(), ""))
+				serviceMethodJSName(method), method.GetName(), interfaceTypeName(c.resolveTypeName(method.GetInputType(), "")), c.resolveTypeName(method.GetOutputType(), ""))
 		}
 		d.L("}")
 
@@ -725,7 +716,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		j.L("}")
 
 		for _, method := range serviceType.GetMethod() {
-			d.Lf(`%s!: I%s["%s"];`, methodName(method), serviceType.GetName(), methodName(method))
+			d.Lf(`%s!: I%s["%s"];`, serviceMethodJSName(method), serviceType.GetName(), serviceMethodJSName(method))
 		}
 
 		// End class definition
@@ -736,8 +727,8 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		for _, method := range serviceType.GetMethod() {
 			j.Lf(
 				"Object.defineProperty(%s.prototype.%s = function %s(request, callback) {",
-				serviceType.GetName(), methodName(method), methodName(method))
-			j.Lf("return this.rpcCall(%s, %s, %s, request, callback);", methodName(method), c.resolveTypeName(method.GetInputType(), "$root."), c.resolveTypeName(method.GetOutputType(), "$root."))
+				serviceType.GetName(), serviceMethodJSName(method), serviceMethodJSName(method))
+			j.Lf("return this.rpcCall(%s, %s, %s, request, callback);", serviceMethodJSName(method), c.resolveTypeName(method.GetInputType(), "$root."), c.resolveTypeName(method.GetOutputType(), "$root."))
 			j.Lf(`}, "name", { value: "%s" });`, method.GetName())
 		}
 
@@ -746,12 +737,25 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 	}
 }
 
-func (c *Codegen) resolveTypeName(name string, localPrefix string) string {
+// resolveTypeName accepts a fully-qualified proto type name such as
+// ".my.package.MyMessage.MyNestedEnum" and resolves it to a fully qualified
+// TypeScript symbol.
+//
+// If the symbol exists in the local file, the given "localRootPrefix" is
+// prepended instead of importing a file. The $root prefix is needed to ensure
+// an absolute symbol reference, i.e. to avoid accidentally referencing a symbol
+// in the current scope.
+//
+// The localRootPrefix should be set to "$root." and only when generating JS
+// code, because TypeScript declarations do not need the "$root" prefix to
+// figure out the right type.
+// TODO: test this assumption - is this accurate?
+func (c *Codegen) resolveTypeName(name string, localRootPrefix string) string {
 	importFile := c.Index.Files[c.Index.FilesByType[name].GetName()]
 	for _, path := range c.Paths {
 		// Type will be generated in the current output file; no need to import.
 		if path == importFile.GetName() {
-			return localPrefix + name[1:]
+			return localRootPrefix + name[1:]
 		}
 	}
 	if importFile == nil {
@@ -834,7 +838,7 @@ func (c *Codegen) singularTypeAnnotation(f *descriptorpb.FieldDescriptorProto) s
 }
 
 func (c *Codegen) presentSingularTypeAnnotation(f *descriptorpb.FieldDescriptorProto) string {
-	if c.isLong(f.GetType()) {
+	if isLong(f.GetType()) {
 		c.d.DefaultImport("long", "Long")
 		c.j.DefaultImport("long", "Long")
 		return "Long"
@@ -892,8 +896,8 @@ func (c *Codegen) defaultValueExpression(f *descriptorpb.FieldDescriptorProto) s
 	}
 
 	t := f.GetType()
-	if c.isLong(t) {
-		return fmt.Sprintf("$util.Long ? $util.Long.fromBits(0, 0, %t) : 0", c.isUnsigned(t))
+	if isLong(t) {
+		return fmt.Sprintf("$util.Long ? $util.Long.fromBits(0, 0, %t) : 0", isUint(t))
 	}
 	switch t {
 	case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE,
@@ -921,16 +925,16 @@ func (c *Codegen) defaultValueExpression(f *descriptorpb.FieldDescriptorProto) s
 
 func (c *Codegen) objectConversionExpression(f *descriptorpb.FieldDescriptorProto, expr string, args ...any) string {
 	expr = fmt.Sprintf(expr, args...)
-	if c.isLong(f.GetType()) {
+	if isLong(f.GetType()) {
 		toNumberArg := ""
-		if c.isUnsigned(f.GetType()) {
+		if isUint(f.GetType()) {
 			toNumberArg = "true"
 		}
 		return fmt.Sprintf(
 			`typeof %s === "number" ? (options.longs === String ? String(%s) : %s) : (options.longs === String ? $util.Long.prototype.toString.call(%s) : options.longs === Number ? new $util.LongBits(%s.low >>> 0, %s.high >>> 0).toNumber(%s) : %s)`,
 			expr, expr, expr, expr, expr, expr, toNumberArg, expr)
 	}
-	if c.isFloatingPoint(f.GetType()) {
+	if isFloatingPoint(f.GetType()) {
 		return fmt.Sprintf(
 			"options.json && !isFinite(%s) ? String(%s) : %s",
 			expr, expr, expr)
@@ -964,54 +968,6 @@ func (c *Codegen) enumZeroValue(f *descriptorpb.FieldDescriptorProto) *descripto
 	return nil
 }
 
-func wireType(f *descriptorpb.FieldDescriptorProto) int32 {
-	switch f.GetType() {
-	case
-		descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
-		descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
-		descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
-		return i64WireType
-	case descriptorpb.FieldDescriptorProto_TYPE_STRING,
-		descriptorpb.FieldDescriptorProto_TYPE_BYTES,
-		descriptorpb.FieldDescriptorProto_TYPE_MESSAGE:
-		return lenWireType
-	case descriptorpb.FieldDescriptorProto_TYPE_GROUP:
-		fatalf("groups are currently unsupported")
-		return -1 // unreachable
-	case descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
-		descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
-		descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
-		return i32WireType
-	default:
-		return varintWireType
-	}
-}
-
-func isPackedField(f *descriptorpb.FieldDescriptorProto) bool {
-	// If the "packed" option is set explicitly, return it.
-	if f.Options != nil && f.Options.Packed != nil {
-		return *f.Options.Packed
-	}
-	return isPackableField(f)
-}
-
-func isPackableField(f *descriptorpb.FieldDescriptorProto) bool {
-	// Only repeated fields can be packed
-	if f.GetLabel() != descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
-		return false
-	}
-	// Message types cannot be packed
-	if f.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
-		return false
-	}
-	switch wireType(f) {
-	case varintWireType, i64WireType, i32WireType:
-		return true
-	default:
-		return false
-	}
-}
-
 // Returns the protobufjs reader/writer method corresponding to the given field
 // type.
 func encodeMethodName(f *descriptorpb.FieldDescriptorProto) string {
@@ -1020,48 +976,6 @@ func encodeMethodName(f *descriptorpb.FieldDescriptorProto) string {
 	}
 	name := descriptorpb.FieldDescriptorProto_Type_name[int32(f.GetType())]
 	return strings.ToLower(strings.TrimPrefix(name, "TYPE_"))
-}
-
-func (c *Codegen) isUnsigned(t descriptorpb.FieldDescriptorProto_Type) bool {
-	switch t {
-	case descriptorpb.FieldDescriptorProto_TYPE_UINT64,
-		descriptorpb.FieldDescriptorProto_TYPE_UINT32:
-		return true
-	default:
-		return false
-	}
-}
-
-func (c *Codegen) isLong(t descriptorpb.FieldDescriptorProto_Type) bool {
-	switch t {
-	case descriptorpb.FieldDescriptorProto_TYPE_INT64,
-		descriptorpb.FieldDescriptorProto_TYPE_UINT64,
-		descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
-		descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
-		descriptorpb.FieldDescriptorProto_TYPE_SINT64:
-		return true
-	default:
-		return false
-	}
-}
-
-func (c *Codegen) isFloatingPoint(t descriptorpb.FieldDescriptorProto_Type) bool {
-	return t == descriptorpb.FieldDescriptorProto_TYPE_DOUBLE || t == descriptorpb.FieldDescriptorProto_TYPE_FLOAT
-}
-
-func excludeMapEntries(messageTypes []*descriptorpb.DescriptorProto) []*descriptorpb.DescriptorProto {
-	out := make([]*descriptorpb.DescriptorProto, 0, len(messageTypes))
-	for _, m := range messageTypes {
-		if m.GetOptions().GetMapEntry() {
-			continue
-		}
-		out = append(out, m)
-	}
-	return out
-}
-
-func parentOneof(message *descriptorpb.DescriptorProto, field *descriptorpb.FieldDescriptorProto) *descriptorpb.OneofDescriptorProto {
-	return message.OneofDecl[field.GetOneofIndex()]
 }
 
 func oneofFieldName(decl *descriptorpb.OneofDescriptorProto) string {
@@ -1083,7 +997,7 @@ func oneofFieldName(decl *descriptorpb.OneofDescriptorProto) string {
 	return out
 }
 
-func methodName(method *descriptorpb.MethodDescriptorProto) string {
+func serviceMethodJSName(method *descriptorpb.MethodDescriptorProto) string {
 	return strings.ToLower(method.GetName()[:1]) + method.GetName()[1:]
 }
 

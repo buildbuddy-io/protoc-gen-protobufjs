@@ -11,16 +11,6 @@ import (
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
-var (
-	importPathFlag              = StringSlice("import_path", []string{}, "A mapping of proto imports to TS imports, as `PROTO_PATH=TS_PATH` pairs (this flag can be specified more than once). If the proto does not end with '.proto' then these act as directory prefixes.")
-	strictImportsFlag           = flag.Bool("strict_imports", false, "If set, all directly imported protos must have an -import_path specified. This prevents the plugin from \"guessing\" import paths based on the proto path. This is also useful when integrating with build systems where all direct dependencies must be explicitly specified.")
-	importModuleSpecifierEnding = flag.String("import_module_specifier_ending", "", "Suffix to apply to generated import module specifiers. May need to be set to \".js\" in rare cases.")
-
-	outFlag = flag.String("out", "", "Output file `path`. If this is set and multiple protos are provided as input, the generated code for all protos will be written to this file. Any '.ts' or '.js' extension will be ignored.")
-
-	importPaths = map[string]string{}
-)
-
 func main() {
 	if err := run(); err != nil {
 		logf("error: %s", err)
