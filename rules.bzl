@@ -74,23 +74,22 @@ def _protoc_gen_protobufjs_impl(ctx):
         executable = ctx.executable._protoc,
         arguments = args,
 
-        # DEBUG:
-        # env = {"DEBUG": "1"},
+        # Debug:
+
         # tools = [ctx.executable._protoc, ctx.executable._protoc_gen_protobufjs],
         # executable = "/bin/bash",
         # arguments = ["-c", """
-        # : "${DEBUG:=0}"
-        # ((DEBUG)) && set -x
-        # ((DEBUG)) && (
-        #     """ + ctx.executable._protoc.path + """ --version
-        #     pwd
-        #     find . | grep -P '\\.proto(.bin)?$'
-        # ) >&2
-        # """ + ctx.executable._protoc.path + " " + " ".join(args) + """
-        # ((DEBUG)) && (
-        #     echo "AFTER running:"
-        #     find | grep -P '\\.ts$'
-        # ) >&2
+        #     set -x
+        #     (
+        #         """ + ctx.executable._protoc.path + """ --version
+        #         pwd
+        #         find . | grep -P '\\.proto(.bin)?$'
+        #     ) >&2
+        #     """ + ctx.executable._protoc.path + " " + " ".join(args) + """
+        #     (
+        #         echo "AFTER running:"
+        #         find | grep -P '\\.ts$'
+        #     ) >&2
         # """],
     )
     return [
