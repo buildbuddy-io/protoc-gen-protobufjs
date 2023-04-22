@@ -31,7 +31,7 @@ def _protoc_gen_protobufjs_impl(ctx):
         "--plugin",
         ctx.executable._protoc_gen_protobufjs.path,
         "--protobufjs_out",
-        ctx.bin_dir.path,
+        ctx.bin_dir.path + "/" + ctx.label.workspace_root,
     ]
 
     inputs = ctx.attr.proto[ProtoInfo].transitive_sources.to_list()
