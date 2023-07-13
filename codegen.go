@@ -554,6 +554,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 				j.Lf(`if (typeof object.%s !== "object") {`, f.GetJsonName())
 				j.Lf(`throw new TypeError(".%s.%s.%s: object expected, but got " + (typeof object.%s));`, ns, messageType.GetName(), f.GetJsonName(), f.GetJsonName())
 				j.L("}")
+				j.Lf("message.%s = {};", f.GetJsonName())
 				j.Lf("for (let keys = Object.keys(object.%s), i = 0; i < keys.length; ++i) {", f.GetJsonName())
 				src := fmt.Sprintf("object.%s[keys[i]]", f.GetJsonName())
 				dest := fmt.Sprintf("message.%s[keys[i]]", f.GetJsonName())
@@ -600,7 +601,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		// Init arrays
 		j.L("if (options.arrays || options.defaults) {")
 		for _, f := range messageType.GetField() {
-			if f.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+			if f.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED && !c.isMapField(f) {
 				j.Lf("object.%s = [];", f.GetJsonName())
 			}
 		}
@@ -728,15 +729,18 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 
 		d.BlockComment(c.Comments[file.GetName()][fmt.Sprint(enumPath)])
 		d.Lf("export enum %s {", enumType.GetName())
-		j.Lf("%s.%s = {", curNS, enumType.GetName())
+		j.Lf("%s.%s = (function() {", curNS, enumType.GetName())
+		j.Lf("const valuesById = {};")
+		j.Lf("const values = Object.create(valuesById);")
 		for valueIndex, value := range enumType.GetValue() {
 			valuePath := append(enumPath, enumDescriptorValueTagNumber, int32(valueIndex))
 			d.BlockComment(c.Comments[file.GetName()][fmt.Sprint(valuePath)])
 			d.Lf("%s = %d,", value.GetName(), value.GetNumber())
-			j.Lf("%s: %d,", value.GetName(), value.GetNumber())
+			j.Lf("values[valuesById[%d] = %q] = %d;", value.GetNumber(), value.GetName(), value.GetNumber())
 		}
 		d.L("}")
-		j.L("};")
+		j.Lf("return values;")
+		j.L("})();")
 	}
 
 	// Generate services

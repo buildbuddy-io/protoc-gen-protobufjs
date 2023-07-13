@@ -43,7 +43,18 @@ function encode<T extends object>(
 
   // Test encode/decode
   const buffer = type.encode(message).finish();
-  checkEqual(message, type.decode(buffer), pbjsType.decode(buffer));
+  const decoded = type.decode(buffer);
+  const decodedPbjs = pbjsType.decode(buffer);
+  checkEqual(message, decoded, decodedPbjs);
+
+  // Test toJSON
+  const json = JSON.stringify(decoded.toJSON(), null, 2);
+  const jsonPbjs = JSON.stringify(decodedPbjs.toJSON(), null, 2);
+  if (json !== jsonPbjs) {
+    console.log('toJSON() does not match protobufjs!');
+    console.log('protobufjs-cli: ' + jsonPbjs);
+    console.log('protoc-gen-protobufjs: ' + json);
+  }
 }
 
 encode<trivial.ITrivialMessage>(
@@ -74,5 +85,10 @@ encode<types.IAllSimpleTypes>(
     }),
     bytes: new Uint8Array([12, 0, 1, 2]),
     mapWithInt64: { foo: new Long(3, 5) },
+
+    // TODO: this fails due to fields being out of order, but is otherwise handled OK.
+    // Need to debug this and uncomment.
+
+    // repeatedSomeEnumValue: [1, 2],
   }
 );
