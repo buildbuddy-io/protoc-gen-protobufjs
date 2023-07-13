@@ -18,11 +18,27 @@ if ! [[ -e "$REPO_ROOT/protoc" ]]; then
   cp ./bazel-bin/external/com_google_protobuf/protoc ./protoc
 fi
 
+if ! command -v protoscope &>/dev/null; then
+  echo "Missing protoscope"
+  echo "Installation instructions: https://github.com/protocolbuffers/protoscope"
+  exit 1
+fi
+if ! command -v pnpm &>/dev/null; then
+  echo "Missing pnpm"
+  echo "Installation instructions: https://pnpm.io/installation"
+  exit 1
+fi
+
 echo "Building protoc-gen-protobufjs"
 go mod tidy
 go build
 
 cd test
+
+# Init node_modules
+if ! [[ -e node_modules ]]; then
+  pnpm install
+fi
 
 # Clean
 rm -rf ./out/ ./gen
