@@ -688,7 +688,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		// getTypeUrl
 		d.L(`static getTypeUrl(typeUrlPrefix = "type.googleapis.com"): string;`)
 		j.L(`static getTypeUrl(typeUrlPrefix = "type.googleapis.com") {`)
-		j.Lf(`return typeUrlPrefix + "%s.%s";`, ns, messageType.GetName())
+		j.Lf(`return typeUrlPrefix + "/%s.%s";`, ns, messageType.GetName())
 		j.L("}")
 
 		// End class definition
