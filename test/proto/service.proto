@@ -16,4 +16,7 @@ service Things {
   rpc GetThing(GetThingRequest) returns (GetThingResponse);
 
   rpc GetOtherThing(GetThingRequest) returns (GetThingResponse);
+
+  // Streams things.
+  rpc GetThings(GetThingRequest) returns (stream GetThingResponse);
 }

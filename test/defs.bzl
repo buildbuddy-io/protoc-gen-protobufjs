@@ -2,13 +2,13 @@ load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
 load("@aspect_rules_jasmine//jasmine:defs.bzl", "jasmine_test")
 load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
-load("@npm//:protobufjs-cli/package_json.bzl", protobufjs_cli_bin = "bin")
+load("@npm//test:protobufjs-cli/package_json.bzl", protobufjs_cli_bin = "bin")
 load("//:rules.bzl", "protoc_gen_protobufjs")
 
 def ts_library(name, srcs, **kwargs):
     ts_project(
         name = name,
-        tsconfig = "//:tsconfig",
+        tsconfig = "//test:tsconfig",
         transpiler = "tsc",
         srcs = srcs,
         **kwargs
@@ -77,8 +77,8 @@ def ts_proto_library(name, out, proto, **kwargs):
 def ts_jasmine_node_test(name, entry_point, deps = [], size = "small", **kwargs):
     deps = list(deps)
     deps.extend([
-        "//:node_modules/@types/node",
-        "//:node_modules/@types/jasmine",
+        "//test:node_modules/@types/node",
+        "//test:node_modules/@types/jasmine",
     ])
 
     ts_library(
@@ -103,5 +103,5 @@ def ts_jasmine_node_test(name, entry_point, deps = [], size = "small", **kwargs)
         args = ["*.test.js"],
         chdir = native.package_name(),
         data = [":%s__bundle.test.js" % name] + deps,
-        node_modules = "//:node_modules",
+        node_modules = "//test:node_modules",
     )

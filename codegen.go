@@ -22,6 +22,35 @@ var (
 	importPaths = map[string]string{}
 )
 
+// Top-level declarations that are duplicated at the top of each generated file.
+//
+// TODO: maybe publish an NPM package with these declarations so they aren't
+// duplicated as much.
+const (
+	streamTypeDeclarations = `
+export namespace $stream {
+	export type ServerStream<T> = {
+		/** Cancels the RPC. */
+		cancel(): void;
+	}
+
+	export type ServerStreamHandler<T> = {
+		/** Handles a message on the stream. */
+		next: (message: T) => void;
+		/** Handles an error on the stream. */
+		error?: (e: any) => void;
+		/** Called when all messages are done being streamed. Not called on error. */
+		complete?: () => void;
+	}
+
+	export type StreamingRPCParams = {
+		signal: AbortSignal;
+		complete: () => void;
+	}
+}
+`
+)
+
 func generateCode(req *pluginpb.CodeGeneratorRequest) (*pluginpb.CodeGeneratorResponse, error) {
 	for _, p := range *importPathFlag {
 		parts := strings.SplitN(p, "=", 2)
@@ -102,6 +131,9 @@ type Codegen struct {
 	d *TS
 	// Generated JS implementation (.js content)
 	j *TS
+
+	// Whether the server-streaming RPC util needs to be generated.
+	HasServerStreamingRPC bool
 
 	// Paths to the top-level protos to be translated to TS.
 	Paths []string
@@ -337,7 +369,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		}
 
 		// Constructor
-		d.Lf("constructor(properties?: I%s): %s;", messageType.GetName(), messageType.GetName())
+		d.Lf("constructor(properties?: I%s);", messageType.GetName())
 		j.Lf("constructor(properties) {")
 		// All repeated fields and maps are initialized to empty
 		for _, f := range messageType.GetField() {
@@ -686,7 +718,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		d.L("toJSON(): Record<string, any>")
 
 		// getTypeUrl
-		d.L(`static getTypeUrl(typeUrlPrefix = "type.googleapis.com"): string;`)
+		d.L(`static getTypeUrl(typeUrlPrefix?: string): string;`)
 		j.L(`static getTypeUrl(typeUrlPrefix = "type.googleapis.com") {`)
 		j.Lf(`return typeUrlPrefix + "/%s.%s";`, ns, messageType.GetName())
 		j.L("}")
@@ -752,9 +784,17 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		for methodIndex, method := range serviceType.GetMethod() {
 			methodPath := append(servicePath, serviceMethodTagNumber, int32(methodIndex))
 			d.BlockComment(c.Comments[file.GetName()][fmt.Sprint(methodPath)])
-			d.Lf(
-				`%s: { readonly name: "%s" } & ((request: %s) => Promise<%s>);`,
-				serviceMethodJSName(method), method.GetName(), interfaceTypeName(c.resolveTypeName(method.GetInputType(), "")), c.resolveTypeName(method.GetOutputType(), ""))
+			if method.GetServerStreaming() {
+				d.AddTopLevelDeclaration(streamTypeDeclarations)
+				d.Lf(`%s: { readonly name: "%s"; readonly serverStreaming: true; } & ((request: %s, handler: $stream.ServerStreamHandler<%s>) => $stream.ServerStream<%s>);`,
+					serviceMethodJSName(method), method.GetName(), interfaceTypeName(c.resolveTypeName(method.GetInputType(), "")), c.resolveTypeName(method.GetOutputType(), ""), c.resolveTypeName(method.GetOutputType(), ""))
+			} else {
+				// Note: we don't support the callback style of method calling that
+				// protobufjs supports - only promises are supported for now.
+				d.Lf(
+					`%s: { readonly name: "%s"; readonly serverStreaming: false; } & ((request: %s) => Promise<%s>);`,
+					serviceMethodJSName(method), method.GetName(), interfaceTypeName(c.resolveTypeName(method.GetInputType(), "")), c.resolveTypeName(method.GetOutputType(), ""))
+			}
 		}
 		d.L("}")
 
@@ -762,18 +802,18 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 		j.Lf("%s.%s = (() => {", curNS, serviceType.GetName())
 		j.Lf("class %s extends $protobuf.rpc.Service {", serviceType.GetName())
 
-		d.L("constructor(rpcImpl: $protobuf.RPCImpl, requestDelimited = false, responseDelimited = false);")
+		d.L("constructor(rpcImpl: $protobuf.RPCImpl, requestDelimited?: boolean, responseDelimited?: boolean);")
 		j.L("constructor(rpcImpl, requestDelimited = false, responseDelimited = false) {")
 		j.Lf("super(rpcImpl, requestDelimited, responseDelimited);")
 		j.L("}")
 
-		d.L("static create(rpcImpl: $protobuf.RPCImpl, requestDelimited = false, responseDelimited = false);")
+		d.Lf("static create(rpcImpl: $protobuf.RPCImpl, requestDelimited?: boolean, responseDelimited?: boolean): %s;", serviceType.GetName())
 		j.L("static create(rpcImpl, requestDelimited = false, responseDelimited = false) {")
 		j.Lf("return new %s(rpcImpl, requestDelimited, responseDelimited);", serviceType.GetName())
 		j.L("}")
 
 		for _, method := range serviceType.GetMethod() {
-			d.Lf(`%s!: I%s["%s"];`, serviceMethodJSName(method), serviceType.GetName(), serviceMethodJSName(method))
+			d.Lf(`%s: I%s["%s"];`, serviceMethodJSName(method), serviceType.GetName(), serviceMethodJSName(method))
 		}
 
 		// End class definition
@@ -782,11 +822,52 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 
 		// Define service methods on class prototype, including readonly "name" prop
 		for _, method := range serviceType.GetMethod() {
-			j.Lf(
-				"Object.defineProperty(%s.prototype.%s = function %s(request, callback) {",
-				serviceType.GetName(), serviceMethodJSName(method), serviceMethodJSName(method))
-			j.Lf("return this.rpcCall(%s, %s, %s, request, callback);", serviceMethodJSName(method), c.resolveTypeName(method.GetInputType(), "$root."), c.resolveTypeName(method.GetOutputType(), "$root."))
+			if method.GetServerStreaming() {
+				j.Lf(
+					"Object.defineProperty(%s.prototype.%s = function %s(request, handler) {",
+					serviceType.GetName(), serviceMethodJSName(method), serviceMethodJSName(method))
+				j.Lf("if (!handler) throw TypeError('stream handler is required for server-streaming RPC');")
+				j.Lf(`if (!handler.next) throw TypeError("stream handler is missing 'next' callback property");`)
+				j.Lf("const controller = new AbortController();")
+				j.Lf("const stream = { cancel: () => controller.abort() };")
+				j.Lf("const callback = (error, data) => {")
+				// Ignore AbortError
+				j.Lf("if (error) {")
+				j.Lf("if (typeof error === 'object' && error.name === 'AbortError') {")
+				j.Lf("return; // stream canceled")
+				j.Lf("}")
+				j.Lf("if (handler.error) {")
+				j.Lf("handler.error(error)")
+				j.Lf("} else {")
+				j.Lf("console.error('Unhandled error in %s.%s RPC:', error)", serviceType.GetName(), method.GetName())
+				j.Lf("}")
+				j.Lf("} else if (data) {")
+				j.Lf("handler.next(data);")
+				j.Lf("}")
+				j.Lf("}")
+				// Hack: temporarily patch rpcImpl to receive an extra options parameter
+				// indicating that this is a server-streaming RPC. This means that we
+				// will invoke the callback multiple times.
+				j.Lf(`const originalRPCImpl = this.rpcImpl;`)
+				j.Lf("const streamParams = { serverStream: true, complete: () => stream.complete(), signal: controller.signal };")
+				j.Lf(`this.rpcImpl = (method, data, callback) => originalRPCImpl(method, data, callback, streamParams);`)
+				j.Lf("try {")
+				j.Lf("this.rpcCall(%s, %s, %s, request, callback);", serviceMethodJSName(method), c.resolveTypeName(method.GetInputType(), "$root."), c.resolveTypeName(method.GetOutputType(), "$root."))
+				j.Lf("return stream;")
+				j.Lf("} finally {")
+				j.Lf("this.rpcImpl = originalRPCImpl;")
+				j.Lf("}")
+			} else {
+				// Assume unary
+				j.Lf(
+					"Object.defineProperty(%s.prototype.%s = function %s(request) {",
+					serviceType.GetName(), serviceMethodJSName(method), serviceMethodJSName(method))
+				j.Lf("return this.rpcCall(%s, %s, %s, request);", serviceMethodJSName(method), c.resolveTypeName(method.GetInputType(), "$root."), c.resolveTypeName(method.GetOutputType(), "$root."))
+			}
 			j.Lf(`}, "name", { value: "%s" });`, method.GetName())
+			j.Lf(
+				`Object.defineProperty(%s.prototype.%s, "serverStreaming", { value: %t });`,
+				serviceType.GetName(), serviceMethodJSName(method), method.GetServerStreaming())
 		}
 
 		j.Lf("return %s;", serviceType.GetName())

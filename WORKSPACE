@@ -85,8 +85,8 @@ load("@aspect_rules_js//npm:repositories.bzl", "npm_translate_lock")
 
 npm_translate_lock(
     name = "npm",
-    npmrc = "//:.npmrc",
-    pnpm_lock = "//:pnpm-lock.yaml",
+    npmrc = "//test:.npmrc",
+    pnpm_lock = "//test:pnpm-lock.yaml",
     verify_node_modules_ignored = "//:.bazelignore",
 )
 
@@ -106,7 +106,7 @@ http_archive(
 load("@aspect_rules_ts//ts:repositories.bzl", "rules_ts_dependencies")
 
 rules_ts_dependencies(
-    ts_version_from = "//:package.json",
+    ts_version_from = "//test:package.json",
 )
 
 http_archive(

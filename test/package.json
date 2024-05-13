@@ -1,14 +1,7 @@
 {
-  "name": "protoc-gen-protobufjs",
-  "version": "0.0.1",
-  "description": "",
-  "main": "index.js",
   "scripts": {
     "test": "bazel test //..."
   },
-  "keywords": [],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
     "@bazel/jasmine": "^5.8.1",
     "@types/jasmine": "^5.1.4",

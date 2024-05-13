@@ -23,12 +23,13 @@ var (
 type TS struct {
 	JS bool
 
-	indentation      string
-	buf              string
-	lastLine         string
-	imports          map[string]*tsImport
-	scope            []string
-	methodScopeIndex int
+	indentation          string
+	buf                  string
+	lastLine             string
+	imports              map[string]*tsImport
+	topLevelDeclarations map[string]struct{}
+	scope                []string
+	methodScopeIndex     int
 }
 
 func (t *TS) Lf(format string, args ...any) {
@@ -168,6 +169,13 @@ func (t *TS) BlockComment(comment string) {
 	t.Lf(" */")
 }
 
+func (t *TS) AddTopLevelDeclaration(code string) {
+	if t.topLevelDeclarations == nil {
+		t.topLevelDeclarations = map[string]struct{}{}
+	}
+	t.topLevelDeclarations[strings.TrimSpace(code)] = struct{}{}
+}
+
 func (t *TS) DefaultImport(pkg, nameAndAlias string) {
 	t.addImport(&tsImport{pkg: pkg, defaultImport: nameAndAlias})
 }
@@ -202,7 +210,15 @@ func (g *TS) String() string {
 		jsHeader += "\n"
 	}
 
-	return jsHeader + importSection + g.buf
+	topLevelDeclarations := ""
+	for code := range g.topLevelDeclarations {
+		topLevelDeclarations += "\n" + code + "\n"
+	}
+	if len(g.topLevelDeclarations) != 0 {
+		topLevelDeclarations += "\n"
+	}
+
+	return jsHeader + importSection + topLevelDeclarations + g.buf
 }
 
 func isMethodOrConstructorDefinitionStart(line string) bool {
