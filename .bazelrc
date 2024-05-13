@@ -2,3 +2,4 @@
 build --cxxopt=-std=c++14
 build --host_cxxopt=-std=c++14
 
+common --@aspect_rules_ts//ts:skipLibCheck=always

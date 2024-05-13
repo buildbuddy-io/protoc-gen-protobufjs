@@ -3,7 +3,7 @@
     "importPath": "./tspb"
   },
   "service": {
-    "preamble": [
+    "imports": [
       "import { UnaryTransport } from './transport';",
       "import { CancelablePromise } from '../util/async';"
     ],

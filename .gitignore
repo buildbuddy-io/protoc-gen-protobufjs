@@ -5,13 +5,8 @@
 # Release archive
 /*.tar.gz
 
-# Test build outputs
-/test/node_modules
-/test/proto/**/*.ts
-/test/proto/google
-/test/**/*.js
-/test/gen
-/test/out
+# npm
+/node_modules
 
 # Bazel convenience symlinks
 /bazel-*
