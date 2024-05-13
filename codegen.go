@@ -29,24 +29,24 @@ var (
 const (
 	streamTypeDeclarations = `
 export namespace $stream {
-	export type ServerStream<T> = {
-		/** Cancels the RPC. */
-		cancel(): void;
-	}
+  export type ServerStream<T> = {
+    /** Cancels the RPC. */
+    cancel(): void;
+  }
 
-	export type ServerStreamHandler<T> = {
-		/** Handles a message on the stream. */
-		next: (message: T) => void;
-		/** Handles an error on the stream. */
-		error?: (e: any) => void;
-		/** Called when all messages are done being streamed. Not called on error. */
-		complete?: () => void;
-	}
+  export type ServerStreamHandler<T> = {
+    /** Handles a message on the stream. */
+    next: (message: T) => void;
+    /** Handles an error on the stream. */
+    error: (e: any) => void;
+    /** Called after all messages have been received from the server. Not called on error. */
+    complete: () => void;
+  }
 
-	export type StreamingRPCParams = {
-		signal: AbortSignal;
-		complete: () => void;
-	}
+  export type StreamingRPCParams = {
+    signal: AbortSignal;
+    complete: () => void;
+  }
 }
 `
 )
@@ -835,11 +835,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 				j.Lf("if (typeof error === 'object' && error.name === 'AbortError') {")
 				j.Lf("return; // stream canceled")
 				j.Lf("}")
-				j.Lf("if (handler.error) {")
 				j.Lf("handler.error(error)")
-				j.Lf("} else {")
-				j.Lf("console.error('Unhandled error in %s.%s RPC:', error)", serviceType.GetName(), method.GetName())
-				j.Lf("}")
 				j.Lf("} else if (data) {")
 				j.Lf("handler.next(data);")
 				j.Lf("}")
@@ -848,7 +844,7 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 				// indicating that this is a server-streaming RPC. This means that we
 				// will invoke the callback multiple times.
 				j.Lf(`const originalRPCImpl = this.rpcImpl;`)
-				j.Lf("const streamParams = { serverStream: true, complete: () => stream.complete(), signal: controller.signal };")
+				j.Lf("const streamParams = { serverStream: true, complete: () => handler.complete(), signal: controller.signal };")
 				j.Lf(`this.rpcImpl = (method, data, callback) => originalRPCImpl(method, data, callback, streamParams);`)
 				j.Lf("try {")
 				j.Lf("this.rpcCall(%s, %s, %s, request, callback);", serviceMethodJSName(method), c.resolveTypeName(method.GetInputType(), "$root."), c.resolveTypeName(method.GetOutputType(), "$root."))
