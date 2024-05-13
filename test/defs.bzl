@@ -75,11 +75,6 @@ def ts_proto_library(name, out, proto, **kwargs):
     )
 
 def ts_jasmine_node_test(name, entry_point, deps = [], size = "small", **kwargs):
-    # jasmine_node_test can't run TS tests directly, so compile the TS to JS
-    # first. Note, this produces an ES6 module. We use ES6 modules as our
-    # transpilation target throughout the app since esbuild currently does not
-    # do code-splitting properly on commonjs modules that are produced by SWC.
-
     deps = list(deps)
     deps.extend([
         "//:node_modules/@types/node",
@@ -96,35 +91,17 @@ def ts_jasmine_node_test(name, entry_point, deps = [], size = "small", **kwargs)
 
     # Bundle with esbuild targeting node to avoid ES modules insanity.
     esbuild(
-        name = "%s__bundle" % name,
+        name = "%s__bundle.test" % name,
         testonly = 1,
         entry_point = entry_point,
         deps = ["%s__lib" % name],
         platform = "node",
     )
 
-    # jasmine_node_test(
-    #     name = name,
-    #     size = "small",
-    #     srcs = [":%s_commonjs.test.js" % name],
-    #     **kwargs
-    # )
-
-    # Copy the commonjs module to trick jasmine_node_test into thinking this is
-    # a plain JS source. The test fails with "no specs found" if we try to pass
-    # the commonjs module output as srcs directly.
-    native.genrule(
-        name = "%s__entrypoint" % name,
-        srcs = [":%s__bundle.js" % name],
-        outs = [":%s.test.js" % name],
-        cmd_bash = "ln $(SRCS) $@ 2>/dev/null || cp $(SRCS) $@",
-        tags = ["local"],
-    )
-
     jasmine_test(
         name = name,
         args = ["*.test.js"],
         chdir = native.package_name(),
-        data = [":%s.test.js" % name] + deps,
+        data = [":%s__bundle.test.js" % name] + deps,
         node_modules = "//:node_modules",
     )
