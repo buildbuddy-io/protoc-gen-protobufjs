@@ -774,6 +774,9 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 
 	// Generate services
 	for serviceIndex, serviceType := range services {
+		// Add type definitions required by services
+		d.AddTopLevelDeclaration(streamTypeDeclarations)
+
 		servicePath := append(sourcePath, fileDescriptorServiceTagNumber, int32(serviceIndex))
 		d.BlockComment(c.Comments[file.GetName()][fmt.Sprint(servicePath)])
 
@@ -782,7 +785,6 @@ func (c *Codegen) generate(file *descriptorpb.FileDescriptorProto, sourcePath []
 			methodPath := append(servicePath, serviceMethodTagNumber, int32(methodIndex))
 			d.BlockComment(c.Comments[file.GetName()][fmt.Sprint(methodPath)])
 			if method.GetServerStreaming() {
-				d.AddTopLevelDeclaration(streamTypeDeclarations)
 				d.Lf(`%s: { readonly name: "%s"; readonly serverStreaming: true; } & ((request: %s, handler: $stream.ServerStreamHandler<%s>) => $stream.ServerStream<%s>);`,
 					serviceMethodJSName(method), method.GetName(), interfaceTypeName(c.resolveTypeName(method.GetInputType(), "")), c.resolveTypeName(method.GetOutputType(), ""), c.resolveTypeName(method.GetOutputType(), ""))
 			} else {
