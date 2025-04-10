@@ -134,13 +134,13 @@ protoc_gen_protobufjs = rule(
         "_protoc": attr.label(
             default = "@com_google_protobuf//:protoc",
             executable = True,
-            cfg = "host",
+            cfg = "exec",
             allow_single_file = True,
         ),
         "_protoc_gen_protobufjs": attr.label(
             default = "@com_github_buildbuddy_io_protoc_gen_protobufjs//:protoc-gen-protobufjs",
             executable = True,
-            cfg = "host",
+            cfg = "exec",
             allow_single_file = True,
         ),
         "_implicit_imports": attr.label_list(
