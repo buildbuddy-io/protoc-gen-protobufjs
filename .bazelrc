@@ -1,5 +1,6 @@
-# C++14 is needed by rules_proto
-build --cxxopt=-std=c++14
-build --host_cxxopt=-std=c++14
-
 common --@aspect_rules_ts//ts:skipLibCheck=always
+
+common --noenable_bzlmod
+common --enable_workspace
+
+common --incompatible_enable_proto_toolchain_resolution

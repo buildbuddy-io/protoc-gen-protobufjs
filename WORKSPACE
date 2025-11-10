@@ -3,20 +3,29 @@ workspace(name = "com_github_buildbuddy_io_protoc_gen_protobufjs")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
-    name = "io_bazel_rules_go",
-    sha256 = "6b65cb7917b4d1709f9410ffe00ecf3e160edf674b78c54a894471320862184f",
+    name = "bazel_skylib",
+    sha256 = "6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.39.0/rules_go-v0.39.0.zip",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.39.0/rules_go-v0.39.0.zip",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.8.2/bazel-skylib-1.8.2.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.8.2/bazel-skylib-1.8.2.tar.gz",
+    ],
+)
+
+http_archive(
+    name = "io_bazel_rules_go",
+    integrity = "sha256-aK9Uy5f73uXl6P6NIQ0VpRj51iq/1xYgw+r/Oyal/4Y=",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.59.0/rules_go-v0.59.0.zip",
+        "https://github.com/bazelbuild/rules_go/releases/download/v0.59.0/rules_go-v0.59.0.zip",
     ],
 )
 
 http_archive(
     name = "bazel_gazelle",
-    sha256 = "ecba0f04f96b4960a5b250c8e8eeec42281035970aa8852dda73098274d14a1d",
+    integrity = "sha256-Z1EU2LQz0Kn1TYEXGDO+luvEETEVZkt5Hm8gTVjpNEY=",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.29.0/bazel-gazelle-v0.29.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.29.0/bazel-gazelle-v0.29.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.47.0/bazel-gazelle-v0.47.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.47.0/bazel-gazelle-v0.47.0.tar.gz",
     ],
 )
 
@@ -29,23 +38,23 @@ protoc_gen_protobufjs_dependencies()
 
 go_rules_dependencies()
 
-go_register_toolchains(version = "1.19.5")
+go_register_toolchains(version = "1.25.4")
 
 gazelle_dependencies()
 
 # Required by com_google_protobuf
 http_archive(
     name = "com_google_googletest",
-    sha256 = "ffa17fbc5953900994e2deec164bb8949879ea09b411e07f215bfbb1f87f4632",
-    strip_prefix = "googletest-1.13.0",
-    urls = ["https://github.com/google/googletest/archive/v1.13.0.zip"],
+    integrity = "sha256-QNTslCIX3MhKnr4qaFhK2n1KM6julYdVdjJ46hxeGP8=",
+    strip_prefix = "googletest-1.17.0",
+    urls = ["https://github.com/google/googletest/archive/v1.17.0.zip"],
 )
 
 http_archive(
     name = "com_google_protobuf",
-    sha256 = "2118051b4fb3814d59d258533a4e35452934b1ddb41230261c9543384cbb4dfc",
-    strip_prefix = "protobuf-3.22.2",
-    urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.22.2.tar.gz"],
+    integrity = "sha256-escvR0NBkLeowzVsjSbTzVsopPtU3f5+gESVq5puD2Y=",
+    strip_prefix = "protobuf-4986a7722460e3163f37c98da1cb47f52c6406e1",
+    urls = ["https://github.com/protocolbuffers/protobuf/archive/4986a7722460e3163f37c98da1cb47f52c6406e1.tar.gz"],
 )
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
@@ -54,12 +63,28 @@ protobuf_deps()
 
 http_archive(
     name = "rules_proto",
-    sha256 = "dc3fb206a2cb3441b485eb1e423165b231235a1ea9b031b4433cf7bc1fa460dd",
-    strip_prefix = "rules_proto-5.3.0-21.7",
-    urls = [
-        "https://github.com/bazelbuild/rules_proto/archive/refs/tags/5.3.0-21.7.tar.gz",
-    ],
+    integrity = "sha256-FKIlhwq06RhpZSz9ae8gKCd/wdxJENZdNTti1uCuIfQ=",
+    strip_prefix = "rules_proto-7.1.0",
+    urls = ["https://github.com/bazelbuild/rules_proto/releases/download/7.1.0/rules_proto-7.1.0.tar.gz"],
 )
+
+load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
+rules_proto_dependencies()
+
+load("@rules_proto//proto:toolchains.bzl", "rules_proto_toolchains")
+rules_proto_toolchains()
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "rules_shell",
+    sha256 = "e6b87c89bd0b27039e3af2c5da01147452f240f75d505f5b6880874f31036307",
+    strip_prefix = "rules_shell-0.6.1",
+    url = "https://github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz",
+)
+
+load("@rules_shell//shell:repositories.bzl", "rules_shell_dependencies", "rules_shell_toolchains")
+rules_shell_dependencies()
+rules_shell_toolchains()
 
 # JS dependencies for testing
 
@@ -138,4 +163,34 @@ load("@aspect_rules_esbuild//esbuild:repositories.bzl", "LATEST_ESBUILD_VERSION"
 esbuild_register_toolchains(
     name = "esbuild",
     esbuild_version = LATEST_ESBUILD_VERSION,
+)
+
+http_archive(
+    name = "toolchains_protoc",
+    sha256 = "b440f7f7624d3c95b72640faa0800ffecd6eecba0799f1cbf739496f62e1689e",
+    strip_prefix = "toolchains_protoc-0.6.0",
+    url = "https://github.com/aspect-build/toolchains_protoc/releases/download/v0.6.0/toolchains_protoc-v0.6.0.tar.gz",
+)
+
+######################
+# toolchains_protoc setup #
+######################
+# Fetches the toolchains_protoc dependencies.
+# If you want to have a different version of some dependency,
+# you should fetch it *before* calling this.
+# Alternatively, you can skip calling this function, so long as you've
+# already fetched all the dependencies.
+load("@toolchains_protoc//protoc:repositories.bzl", "rules_protoc_dependencies")
+
+rules_protoc_dependencies()
+
+load("@bazel_features//:deps.bzl", "bazel_features_deps")
+
+bazel_features_deps()
+
+load("@toolchains_protoc//protoc:toolchain.bzl", "protoc_toolchains")
+
+protoc_toolchains(
+    name = "protoc_toolchains",
+    version = "v32.3",
 )
